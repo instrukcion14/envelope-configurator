@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Type, ImagePlus, Trash2, Copy, RotateCw, ZoomIn, ZoomOut, Upload, AlignLeft, AlignCenter, AlignRight, Bold, Italic } from 'lucide-react';
+import { Type, ImagePlus, Trash2, Copy, AlignLeft, AlignCenter, AlignRight, Bold, Italic } from 'lucide-react';
 
 export default function AdvancedEnvelopeConfigurator() {
   const [elements, setElements] = useState([
