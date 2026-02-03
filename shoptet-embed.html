@@ -1,0 +1,201 @@
+<!--
+  ============================================================
+  SHOPTET EMBED SNIPPET  –  Wooden Envelope Configurator
+  ============================================================
+  1. Paste the <style> block into your Shoptet CSS (or keep it here)
+  2. Paste the <div id="configurator-btn"> + <div id="configurator-modal">
+     into your PRODUCT PAGE template (e.g. detail.html)
+     Place it AFTER the product image / main photo block.
+  3. Paste the <script> at the END of <body> (or wrap in DOMContentLoaded)
+  4. Change CONFIGURATOR_URL below to your GitHub Pages URL
+  ============================================================
+-->
+
+<!-- ========== CSS ========== -->
+<style>
+  /* --- the "Design it" button on product page --- */
+  #configurator-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 16px;
+    padding: 14px 28px;
+    background: linear-gradient(135deg, #b45309, #d97706);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(180,83,9,0.35);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  #configurator-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(180,83,9,0.45);
+  }
+  #configurator-btn svg { width: 20px; height: 20px; }
+
+  /* --- fullscreen modal overlay --- */
+  #configurator-modal {
+    display: none;                /* hidden by default */
+    position: fixed;
+    inset: 0;                     /* top:0 right:0 bottom:0 left:0 */
+    z-index: 99999;
+    background: #000;
+  }
+  #configurator-modal.open {
+    display: block;
+  }
+  #configurator-modal iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block;
+  }
+
+  /* --- saved design preview in cart / order notes --- */
+  .configurator-preview-wrap {
+    margin-top: 12px;
+    padding: 10px;
+    background: #faf7f0;
+    border: 1px solid #e5ddd0;
+    border-radius: 8px;
+  }
+  .configurator-preview-wrap img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 6px;
+  }
+  .configurator-preview-label {
+    font-size: 12px;
+    color: #78716c;
+    margin-bottom: 6px;
+    font-weight: 500;
+  }
+</style>
+
+<!-- ========== HTML – place on product page ========== -->
+
+<!-- Button that opens the configurator -->
+<div style="margin-top: 16px;">
+  <button id="configurator-btn">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+    </svg>
+    Navrhni si vlastné
+  </button>
+</div>
+
+<!-- Preview of saved design (hidden until user designs something) -->
+<div id="configurator-preview-container" class="configurator-preview-wrap" style="display:none;">
+  <div class="configurator-preview-label">Tvoj návrh:</div>
+  <img id="configurator-preview-img" src="" alt="návrh obálky" />
+</div>
+
+<!-- Fullscreen modal – the iframe loads inside here -->
+<div id="configurator-modal">
+  <!-- iframe is injected by JS when modal opens; removed on close to free memory -->
+</div>
+
+<!-- ========== SCRIPT ========== -->
+<script>
+(function() {
+  // -------------------------------------------------------
+  // CONFIG – change this URL to your deployed configurator
+  // -------------------------------------------------------
+  var CONFIGURATOR_URL = 'https://instrukcion14.github.io/envelope-configurator/';
+
+  // Detect current Shoptet language.
+  // Shoptet sets <html lang="sk"> on the page – we read it here.
+  // If not found, fall back to 'sk'.
+  function detectShoptetLang() {
+    var html = document.documentElement;
+    var lang = (html.getAttribute('lang') || 'sk').toLowerCase().slice(0,2);
+    return ['sk','cs','en'].indexOf(lang) !== -1 ? lang : 'sk';
+  }
+
+  var modal    = document.getElementById('configurator-modal');
+  var btn      = document.getElementById('configurator-btn');
+  var previewC = document.getElementById('configurator-preview-container');
+  var previewI = document.getElementById('configurator-preview-img');
+
+  // In-memory store for the last saved config + thumbnail
+  var savedConfig    = null;   // { elements, backgroundSrc }
+  var savedThumb     = null;   // base64 PNG data-URL
+
+  // -------------------------------------------------------
+  // OPEN modal
+  // -------------------------------------------------------
+  btn.addEventListener('click', function() {
+    var lang = detectShoptetLang();
+    var url  = CONFIGURATOR_URL + '?lang=' + lang;
+
+    // Create iframe
+    var iframe = document.createElement('iframe');
+    iframe.src = url;
+    iframe.setAttribute('allowfullscreen', '');
+    iframe.setAttribute('allow', 'autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture');
+
+    // Clear any previous iframe
+    modal.innerHTML = '';
+    modal.appendChild(iframe);
+
+    // Show modal
+    modal.classList.add('open');
+
+    // If we have a previously saved config, push it into the iframe once loaded
+    if (savedConfig) {
+      iframe.onload = function() {
+        iframe.contentWindow.postMessage({
+          type: 'load-config',
+          config: savedConfig
+        }, '*');
+      };
+    }
+
+    // Prevent body scroll while modal is open
+    document.body.style.overflow = 'hidden';
+  });
+
+  // -------------------------------------------------------
+  // CLOSE modal  –  listen for postMessage from configurator
+  // -------------------------------------------------------
+  window.addEventListener('message', function(ev) {
+    // Only trust messages from our configurator origin
+    // (in dev you may need to relax this check)
+    if (ev.data && ev.data.type === 'configurator-close') {
+      // 1. Save config + thumbnail in memory
+      savedConfig = ev.data.config;   // { elements, backgroundSrc }
+      savedThumb  = ev.data.thumbnail; // base64 PNG
+
+      // 2. Show the preview on the product page
+      if (savedThumb) {
+        previewI.src = savedThumb;
+        previewC.style.display = 'block';
+      }
+
+      // 3. (OPTIONAL) Store in a hidden input so it goes with "Add to cart"
+      //    Shoptet custom fields can be passed as hidden inputs.
+      //    Replace 'custom_design_preview' with your actual Shoptet custom field name.
+      var hiddenInput = document.getElementById('configurator-hidden-thumb');
+      if (!hiddenInput) {
+        hiddenInput = document.createElement('input');
+        hiddenInput.type = 'hidden';
+        hiddenInput.id   = 'configurator-hidden-thumb';
+        hiddenInput.name = 'custom_design_preview';  // <-- Shoptet custom field name
+        document.body.appendChild(hiddenInput);
+      }
+      if (savedThumb) {
+        hiddenInput.value = savedThumb;
+      }
+
+      // 4. Close the modal
+      modal.classList.remove('open');
+      modal.innerHTML = '';  // destroy iframe to free memory
+      document.body.style.overflow = '';  // restore scroll
+    }
+  });
+
+})();
+</script>

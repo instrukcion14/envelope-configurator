@@ -1,0 +1,6 @@
+# Force UTF-8 for all text files — prevents GitHub web UI from re-encoding
+*.js    text eol=lf linguist-language=JavaScript
+*.jsx   text eol=lf linguist-language=JavaScript
+*.css   text eol=lf
+*.html  text eol=lf
+*.json  text eol=lf
